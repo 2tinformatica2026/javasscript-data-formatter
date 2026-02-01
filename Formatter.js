@@ -1,4 +1,5 @@
 class Formatter {
+    TimeFormat = { none: 0, hm: 1, hms: 2 };
     #DateFormat = ["", "", ""];
     #CurrencyDecimalSeparator;
     constructor(ShortDatePattern, CurrencyDecimalSeparator) {
@@ -16,6 +17,7 @@ class Formatter {
         var year;
         var hour = 0;
         var minute = 0;
+        var seconds = 0;
         var DateTime = DateString.trim().split(' ');
         var SplittedDate = DateTime[0].split("/");
         for (var i = 0; i < this.#DateFormat.length; i++) {
@@ -33,38 +35,71 @@ class Formatter {
         }
         if (DateTime.length > 1) {
             var SplittedTime = DateTime[DateTime.length - 1].split(":");
-            hour = parseInt(SplittedTime[0]);
-            minute = parseInt(SplittedTime[1]);
+            for (var i = 0; i < SplittedTime.length; i++) {
+                switch (i) {
+                    case 0:
+                        hour = parseInt(SplittedTime[0]);
+                        break;
+                    case 1:
+                        minute = parseInt(SplittedTime[1]);
+                        break;
+                    case 2:
+                        seconds = parseInt(SplittedTime[2]);
+                        break;
+                }
+            }
         }
-        return { day: day, month: month, year: year, hour: hour, minute: minute }
+        return { day: day, month: month, year: year, hour: hour, minute: minute, seconds: seconds }
     }
     //from user page to server
-    UserDateToISOString(DateString) {
-        var dte = this.#SplittedDateString(DateString);
-        var result = new Date(dte.year, dte.month-1, dte.day, dte.hour, dte.minute).toISOString();
+    UserDateToUTCISOString(DateString) {
+        var result = '';
+        if (DateString.trim() != '') {
+            var dte = this.#SplittedDateString(DateString);
+            result = new Date(dte.year, dte.month - 1, dte.day, dte.hour, dte.minute, dte.seconds).toISOString();
+        }
+        return result;
+    }
+    UserDateToISO8601String(DateString) {
+        var result = '';
+        if (DateString.trim() != '') {
+            var dte = this.#SplittedDateString(DateString);
+            var day = String(dte.day).padStart(2, '0');
+            var month = String(dte.month).padStart(2, '0');
+            var year = String(dte.year).padStart(4, '19');
+            var hour = String(dte.hour).padStart(2, '00');
+            var minute = String(dte.minute).padStart(2, '00');
+            var seconds = String(dte.seconds).padStart(2, '00');
+            var result = year + '-' + month + '-' + day + 'T' + hour + ':' + minute + ':' + seconds + 'Z';
+        }
         return result;
     }
     //from server to user page
-    ServerDateToUserString(ISODateString, TimeIncluded = false) {
-        var data = new Date(ISODateString);
+    ServerDateToUserString(ISODateString, time = this.TimeFormat.none) {
         var result = '';
-        for (var i = 0; i < this.#DateFormat.length; i++) {
-            switch (this.#DateFormat[i]) {
-                case 'd':
-                    if (result != '') result = result + '/';
-                    result = result + String(data.getDate()).padStart(2, '0');
-                    break;
-                case 'm':
-                    if (result != '') result = result + '/';
-                    result = result + String(data.getMonth() + 1).padStart(2, '0');
-                    break;
-                case 'y':
-                    if (result != '') result = result + '/';
-                    result = result + String(data.getFullYear());
-                    break;
+        if (ISODateString.trim() != '') {
+            var data = new Date(ISODateString);
+            for (var i = 0; i < this.#DateFormat.length; i++) {
+                switch (this.#DateFormat[i]) {
+                    case 'd':
+                        if (result != '') result = result + '/';
+                        result = result + String(data.getDate()).padStart(2, '0');
+                        break;
+                    case 'm':
+                        if (result != '') result = result + '/';
+                        result = result + String(data.getMonth() + 1).padStart(2, '0');
+                        break;
+                    case 'y':
+                        if (result != '') result = result + '/';
+                        result = result + String(data.getFullYear());
+                        break;
+                }
+            }
+            if (time == this.TimeFormat.hm || time == this.TimeFormat.hms) {
+                result = result + ' ' + String(data.getHours()).padStart(2, '0') + ':' + String(data.getMinutes()).padStart(2, '0');
+                if (time == this.TimeFormat.hms) result = result + ':' + String(data.getSeconds()).padStart(2, '0');
             }
         }
-        if (TimeIncluded) result = result + ' ' + String(data.getHours()).padStart(2, '0') + ':' + String(data.getMinutes()).padStart(2, '0');
         return result;
     }
     //from user page to server
@@ -80,7 +115,7 @@ class Formatter {
     }
     //from server to user page
     ServerNumberToUserString(number, decimals = 0) {
-        if (number != null) {
+        if (number != null & number !='') {
             if (decimals > 0) number = number.toFixed(decimals);
             number = String(number);
             number = number.replace('.', this.#CurrencyDecimalSeparator);
